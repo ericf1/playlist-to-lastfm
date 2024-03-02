@@ -8,8 +8,9 @@ import jellyfish
 load_dotenv()
 
 token = os.getenv("TOKEN")
-playlist_link = "https://open.spotify.com/playlist/2D2r0Wi6PxYvYHvCsQ96tt?si=5458d57f1c234572"
-
+playlist_link = "https://open.spotify.com/playlist/4zAtM3PGtgMbjAsUfqkwV4?si=992cd50f52744a7c"
+lastfminfocsv = "lastfminfovortexual.csv"
+# playlist_link = "https://open.spotify.com/playlist/06GSeylPe9AcW3691Nrz7i?si=c9ce8935b974419d"
 playlist_id = playlist_link.split("/")[4].split("?")[0]
 
 length = 100
@@ -28,9 +29,13 @@ while length == 100:
     s = r.json()
     playlist = s["items"]
     for item in playlist:
-        names.append(item["track"]["name"])
-        artists.append(item["track"]["artists"][0]["name"])
-        ids.append(item["track"]["id"])
+        try:
+            names.append(item["track"]["name"])
+            artists.append(item["track"]["artists"][0]["name"])
+            ids.append(item["track"]["id"])
+        except TypeError:
+            print("This item has failed!")
+            print(item)
 
     length = len(playlist)
     i += 100
@@ -40,7 +45,7 @@ df = pd.DataFrame({
     "artists": artists,
     "ids": ids,
 })
-df2 = pd.read_csv("lastfminfo.csv")
+df2 = pd.read_csv(lastfminfocsv)
 
 
 def v(nonalpha):
@@ -67,24 +72,30 @@ final_artists = []
 final_playcounts = []
 final_ids = []
 
+
+def vectorize_rows(compare_str, compare_strs, playcounts):
+    sim = jellyfish.jaro_similarity(compare_str, compare_strs)
+    return sim, playcounts
+
+
+vfunc = np.vectorize(vectorize_rows)
+
+print("Comparing all songs with each other and making the best match!")
 for i, r in df.iterrows():
-    max_sim = -1
     final_names.append(r["names"])
     final_artists.append(r["artists"])
     final_ids.append(r["ids"])
-    for i, r2 in df2.iterrows():
-        sim = jellyfish.jaro_similarity(r["compare_str"], r2["compare_str"])
-        if sim == 1:
-            potential_final_playcount = r2["playcounts"]
-            break
-        if sim > max_sim:
-            max_sim = sim
-            potential_final_playcount = r2["playcounts"]
-    final_playcounts.append(potential_final_playcount)
+    similarity, playcounts = vfunc(
+        r["compare_str"], df2["compare_str"], df2["playcounts"])
+    index = similarity.argmax(axis=0)
+    final_playcounts.append(playcounts[index])
 
-print(final_playcounts)
+final_df = pd.DataFrame({
+    "names": final_names,
+    "artists": final_artists,
+    "playcounts": final_playcounts,
+    "ids": final_ids
+})
 
-# final_df = pd.merge(df, df2, how="left", on="compare_str")
-# final_df = final_df.sort_values(by=['playcounts'])
-# final_df = final_df.drop("compare_str", axis=1)
-# final_df.to_csv("toConvertToPlaylist.csv")
+final_df = final_df.sort_values(by=['playcounts'], ascending=False)
+final_df.to_csv("toConvertToPlaylist.csv", index=False)

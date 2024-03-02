@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 last_fm_key = os.getenv("LASTFM_KEY")
-username = "humaneach"
+username = "vortexual"
 
 
 def getTopTracks(page):

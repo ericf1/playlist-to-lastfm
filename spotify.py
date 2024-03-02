@@ -1,4 +1,5 @@
 import os
+import requests
 from dotenv import load_dotenv
 from requests_oauthlib import OAuth2Session
 from requests.auth import HTTPBasicAuth
@@ -12,7 +13,10 @@ client_secret = os.getenv("SPOTIFY_SECRET")
 spotify = OAuth2Session(client_id, scope=[
     "playlist-read-private",
     "user-read-email",
-    "playlist-read-collaborative"
+    "playlist-read-collaborative",
+    "playlist-modify-private",
+    "playlist-modify-public",
+    "user-read-private"
 ], redirect_uri="http://localhost:3000/")
 
 authorization_url, state = spotify.authorization_url(
@@ -42,3 +46,12 @@ token = spotify.fetch_token(
     authorization_response=redirect_response)
 
 print("\n" + token["access_token"])
+
+r = requests.get(
+    "https://api.spotify.com/v1/me",
+    headers={
+        "Authorization": f"Bearer {token['access_token']}"
+    }
+)
+
+print("\n" + r.json()["id"])
